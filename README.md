@@ -22,6 +22,10 @@ This pack is intentionally strict:
 - It requires native structured choice UI such as `request_user_input` / `AskUserQuestion`.
 - It does not fall back to plain text `1/2/3` choice lists.
 - If native choice UI is unavailable, the workflow should stop and ask the user to enable it.
+- Default detailed discussion asks 12-20 cumulative questions across multiple native UI rounds, not just one popup.
+- One native UI round can contain up to 3 questions; the workflow should continue asking follow-up rounds until the selected discussion depth is complete.
+- Each question should provide 3 formal options when possible. Codex adds the Other/custom input row automatically, so users typically see 4 visible rows.
+- Do not provide 4 formal options manually: the current `request_user_input` schema accepts 2-3 formal options, then the client adds Other.
 
 ## Install
 

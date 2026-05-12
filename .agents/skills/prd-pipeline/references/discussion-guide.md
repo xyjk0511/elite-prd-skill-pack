@@ -13,9 +13,10 @@ Capture product decisions that downstream PRD, audit, handoff, and QA steps need
 3. Present those gray areas with the native structured question UI. Do not use text 1/2/3 fallback. Recommend discussing all critical areas for full PRD quality.
 4. For each selected area, ask 4-5 concrete multiple-choice questions, again preferring native structured UI.
 5. Target 12-20 questions total in the default detailed mode.
-6. After each area, ask whether to continue that area or move to the next using a multiple-choice control question.
-7. Summarize decisions into `PRD Discussion Context`.
-8. Ask whether to generate the PRD package now using a multiple-choice control question.
+6. Ask at most 3 questions per native UI round; after the user answers, continue with the next round until the mode's question target is reached.
+7. After each area, ask whether to continue that area or move to the next using a native choice control question.
+8. Summarize decisions into `PRD Discussion Context`.
+9. Ask whether to generate the PRD package now using a native choice control question.
 
 ## Discussion Depth
 
@@ -28,6 +29,12 @@ Default to detailed mode unless the user explicitly asks otherwise.
 | Exhaustive | User says “极细”, “多问”, “深挖” | 20+ |
 
 In detailed mode, cover at least 3 gray areas when possible. If the user selects only 1 area, explain that the resulting PRD will be under-specified and ask whether to include the other critical areas.
+
+Native UI rounds are not the same as total question count:
+
+- A native UI round may contain 1-3 questions.
+- A default detailed discussion usually needs 4-7 rounds to reach 12-20 total questions.
+- Do not stop after the first 3 questions unless the user explicitly asks to stop or continue with assumptions.
 
 ## Gray Area Identification
 
@@ -68,7 +75,8 @@ Native UI rules:
 
 - Ask 1 question per round by default.
 - Ask at most 3 closely related questions in one structured UI call.
-- Provide 2-3 mutually exclusive options per question.
+- Provide 3 mutually exclusive options per question whenever possible. Use 2 only when there is no meaningful third path.
+- The Codex client automatically adds Other/custom input, so 3 provided options appear to the user as 4 visible rows. Do not attempt to provide 4 formal options; `request_user_input` accepts 2-3 provided options.
 - Put the recommended option first and label it as recommended when the tool convention requires it.
 - Provide a short description for every option, explaining the product implication.
 - Do not manually add `Other` if the client automatically provides Other.
@@ -134,11 +142,11 @@ Bad:
 
 For each gray area, ask 4-5 questions like:
 
-1. Primary decision: Which direction should this area take? Use 2-3 concrete choices plus `其他`.
-2. Boundary decision: What is explicitly out of scope? Use 2-3 scope choices plus `其他`.
-3. State/flow decision: What should happen before, during, after? Use 2-3 flow choices plus `其他`.
-4. Acceptance decision: What would make this area count as working? Use 2-3 acceptance choices plus `其他`.
-5. Edge decision: What failure, exception, or misuse case must be handled? Use 2-3 edge-case choices plus `其他`.
+1. Primary decision: Which direction should this area take? Use 3 concrete choices plus client-provided Other.
+2. Boundary decision: What is explicitly out of scope? Use 3 scope choices plus client-provided Other.
+3. State/flow decision: What should happen before, during, after? Use 3 flow choices plus client-provided Other.
+4. Acceptance decision: What would make this area count as working? Use 3 acceptance choices plus client-provided Other.
+5. Edge decision: What failure, exception, or misuse case must be handled? Use 3 edge-case choices plus client-provided Other.
 
 Then ask:
 
