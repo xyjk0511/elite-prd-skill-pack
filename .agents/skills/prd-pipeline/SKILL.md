@@ -21,6 +21,8 @@ requirements-clarity
 
 默认行为是**先详细讨论，再产出**。除非用户明确说“快速版”“直接写”“不要问”“按你判断”或传入 `--auto`，否则不要从一句想法直接生成全套文档。
 
+参考 `autoresearch` 的完成方式：pipeline 不能因为 Codex 说“完成”就结束，必须有明确的 completion artifact 证明通过验证。
+
 默认讨论深度：
 
 - 生成 3-4 个产品专属灰区。
@@ -66,6 +68,71 @@ requirements-clarity
 - 用户选择灰区后，按灰区逐轮追问；每轮最多 3 个问题。
 - 每轮结束后，如果尚未达到该模式的问题目标，不要总结生成 PRD；继续弹下一轮原生选择题。
 - 只有达到问题目标，或用户明确选择“停止讨论 / 生成 PRD / 直接继续”，才进入 Requirements Packet 或后续 PRD 产出。
+
+## Autoresearch-Style 验证契约
+
+PRD pipeline 采用 artifact-gated completion。完成条件不是“文档已生成”，而是验证产物明确通过。
+
+### Init: 选择验证模式
+
+开始全流程时必须选择一个验证模式，优先用原生结构化选择 UI：
+
+| 验证模式 | 适用场景 | 完成条件 |
+|---|---|---|
+| `pipeline-audit-artifact` | 默认推荐；适合多数 PRD -> handoff -> QA 流程 | PRD 审计无 P0 blocker，必需文档都存在，`pipeline-result-[feature].json` 记录 `passed: true` |
+| `human-approval-artifact` | 用户或团队要先人工确认 PRD 再算完成 | 结果文件记录人工 approval，且产物路径齐全 |
+| `custom-validator-script` | 团队已有自己的检查脚本或 CI 规则 | 指定 validator command 返回通过，并写入结果文件 |
+
+如果用户没有选择，默认使用 `pipeline-audit-artifact`。
+
+### State: 持久化运行状态
+
+全流程落盘时，必须同时维护一个结果文件：
+
+```text
+docs/prd/pipeline-result-[feature-name].json
+```
+
+如果仓库使用 `.omx/` 状态目录，也可以额外写入：
+
+```text
+.omx/specs/prd-pipeline-[feature-name]/result.json
+```
+
+结果文件至少包含：
+
+```json
+{
+  "status": "passed",
+  "passed": true,
+  "validation_mode": "pipeline-audit-artifact",
+  "completion_artifact_path": "docs/prd/pipeline-result-feature.json",
+  "artifacts": {
+    "discussion_context": "docs/prd/context-feature.md",
+    "prd": "docs/prd/prd-feature.md",
+    "audit": "docs/prd/audit-feature.md",
+    "handoff": "docs/handoff/handoff-feature.md",
+    "qa": "docs/qa/qa-feature.md"
+  },
+  "audit": {
+    "verdict": "可以开工",
+    "p0_blockers": []
+  },
+  "summary": "PRD package passed pipeline validation."
+}
+```
+
+### Completion: 只允许 artifact 通过后结束
+
+不得因为以下情况声称 pipeline 完成：
+
+- PRD 文档已经写完，但 audit / handoff / QA 缺失。
+- audit 说“补充后开工”但仍有 P0 blocker。
+- 只完成一轮选择题或少于当前模式的问题目标。
+- 模型主观判断“应该够了”，但没有 completion artifact。
+- result JSON 不存在，或 `passed` 不是 `true`。
+
+如果验证未通过，必须回到对应步骤修复：需求缺口回 Step 0/1，PRD 缺口回 Step 2，审计阻塞回 Step 3，handoff/QA 缺口回 Step 4/5。
 
 ### 工具不可用时
 
@@ -231,6 +298,28 @@ Gate:
 
 必须覆盖主流程、必填校验、边界值、权限失败、空状态、网络/API 失败、重复提交、状态冲突、埋点验证和回归风险。
 
+### Step 6: Completion Validation
+
+按 `references/pipeline-gates.md` 执行最终验证，并写入 `pipeline-result-[feature-name].json`。
+
+必须检查：
+
+- `PRD Discussion Context` 存在，且记录已讨论灰区和锁定决策。
+- `Requirements Packet` 存在，且清晰度评分达到当前 gate。
+- PRD 文件存在，且 P0 验收标准、范围边界、状态机、权限、字段和埋点不缺失。
+- Audit 文件存在，且没有 P0 blocker。
+- Handoff 文件存在，且包含任务拆解、接口/数据草案、联调计划和发布/回滚要点。
+- QA 文件存在，且覆盖主流程、异常、权限、边界、状态冲突和埋点验证。
+- result JSON 存在，`passed` 为 `true`。
+
+如果仓库允许运行本技能脚本，可用：
+
+```bash
+python .agents/skills/prd-pipeline/scripts/validate_pipeline_result.py --result docs/prd/pipeline-result-[feature-name].json
+```
+
+只有验证通过后，`Pipeline Summary` 的“是否完整跑完”才能写“是”。
+
 ## 输出格式
 
 默认输出：
@@ -262,6 +351,14 @@ Gate:
 
 ## QA Packet
 
+## Completion Validation
+
+- validation_mode:
+- completion_artifact_path:
+- passed:
+- validator:
+- remaining_blockers:
+
 ## 文件清单
 
 | 类型 | 路径 | 状态 |
@@ -277,6 +374,8 @@ Gate:
 ```text
 docs/prd/context-[feature-name].md
 docs/prd/prd-[feature-name].md
+docs/prd/audit-[feature-name].md
+docs/prd/pipeline-result-[feature-name].json
 docs/handoff/handoff-[feature-name].md
 docs/qa/qa-[feature-name].md
 ```
@@ -290,6 +389,8 @@ python .agents/skills/implementation-handoff/scripts/save_doc.py --path docs/han
 
 QA 文档可直接由 Codex 写入目标 Markdown 文件；若仓库有更具体脚本，优先用仓库脚本。
 
+最终必须写入 completion artifact；没有 result JSON 时，只能报告“文档已生成但 pipeline 未验证完成”。
+
 ## 失败与回退
 
 - 用户还没讨论关键灰区：不要生成完整文档，先问。
@@ -299,6 +400,7 @@ QA 文档可直接由 Codex 写入目标 Markdown 文件；若仓库有更具体
 - 审计不通过：停在 Step 3，输出阻塞项。
 - handoff 发现需求缺口：回到 Step 2 或 Step 3。
 - QA 无法生成关键用例：回到 Step 2 补验收标准、状态机、权限或字段规则。
+- completion artifact 不存在或未通过：不要声称 pipeline 完成，先修复缺失产物或阻塞项。
 
 ## 严格禁止
 
@@ -308,3 +410,4 @@ QA 文档可直接由 Codex 写入目标 Markdown 文件；若仓库有更具体
 - 不要在 pipeline 里直接开始编码。
 - 不要只输出 happy path。
 - 不要在 PRD 未通过审计时声称研发可开工。
+- 不要在缺少 completion artifact 时声称全流程完成。

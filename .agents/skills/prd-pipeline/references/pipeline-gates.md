@@ -20,3 +20,82 @@ PRD Discussion Context -> Requirements Packet -> PRD Packet -> Audit Packet -> H
 ```
 
 Each packet should preserve paths, scope, blockers, and next-step status.
+
+## Autoresearch-Style Completion Gate
+
+The pipeline is not complete until a completion artifact exists and passes validation. Do not treat a generated PRD, model confidence, or a one-time stop condition as completion evidence.
+
+## Validation Modes
+
+| Mode | Use When | Required Completion Evidence |
+|---|---|---|
+| `pipeline-audit-artifact` | Default mode for normal PRD packages | `pipeline-result-[feature].json` has `passed: true`, required artifact paths, audit verdict, and no P0 blockers |
+| `human-approval-artifact` | A human stakeholder must approve before downstream work | Result JSON records an explicit approval verdict and required artifact paths |
+| `custom-validator-script` | The repository has a deterministic validator or CI check | Result JSON records the validator command and a passing validator result |
+
+## Completion Artifact Schema
+
+Recommended path:
+
+```text
+docs/prd/pipeline-result-[feature-name].json
+```
+
+Minimum shape:
+
+```json
+{
+  "status": "passed",
+  "passed": true,
+  "validation_mode": "pipeline-audit-artifact",
+  "completion_artifact_path": "docs/prd/pipeline-result-feature.json",
+  "artifacts": {
+    "discussion_context": "docs/prd/context-feature.md",
+    "prd": "docs/prd/prd-feature.md",
+    "audit": "docs/prd/audit-feature.md",
+    "handoff": "docs/handoff/handoff-feature.md",
+    "qa": "docs/qa/qa-feature.md"
+  },
+  "audit": {
+    "verdict": "可以开工",
+    "p0_blockers": []
+  },
+  "summary": "PRD package passed pipeline validation."
+}
+```
+
+For `human-approval-artifact`, include:
+
+```json
+{
+  "approval": {
+    "verdict": "approved",
+    "source": "user",
+    "summary": "Approved for implementation handoff."
+  }
+}
+```
+
+For `custom-validator-script`, include:
+
+```json
+{
+  "validator": {
+    "command": "python scripts/check_prd_package.py docs/prd/pipeline-result-feature.json",
+    "status": "passed",
+    "passed": true
+  }
+}
+```
+
+## Final Stop Rule
+
+Only stop with “complete” when:
+
+1. Required Markdown artifacts exist.
+2. The result JSON exists.
+3. `passed` is `true`.
+4. The selected validation mode's required evidence is present.
+5. No P0 blockers remain.
+
+If any item fails, return to the earliest stage that can repair the missing evidence.

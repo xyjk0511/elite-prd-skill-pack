@@ -26,6 +26,8 @@ This pack is intentionally strict:
 - One native UI round can contain up to 3 questions; the workflow should continue asking follow-up rounds until the selected discussion depth is complete.
 - Each question should provide 3 formal options when possible. Codex adds the Other/custom input row automatically, so users typically see 4 visible rows.
 - Do not provide 4 formal options manually: the current `request_user_input` schema accepts 2-3 formal options, then the client adds Other.
+- Completion is artifact-gated, inspired by `$autoresearch`: the full pipeline should write `docs/prd/pipeline-result-[feature].json` and only report complete when that result records `passed: true`.
+- The default validation mode is `pipeline-audit-artifact`; advanced teams can use `human-approval-artifact` or `custom-validator-script`.
 
 ## Install
 
@@ -77,6 +79,12 @@ bash scripts/validate.sh
 ```
 
 Validation checks that each skill has a `SKILL.md` with required frontmatter fields.
+
+To validate a generated PRD pipeline result:
+
+```bash
+python .agents/skills/prd-pipeline/scripts/validate_pipeline_result.py --result docs/prd/pipeline-result-item-publishing.json
+```
 
 ## Usage
 
