@@ -1,0 +1,7 @@
+interface:
+  display_name: "PRD Pipeline"
+  short_description: "Run the full PRD-to-QA workflow."
+  default_prompt: "Use $prd-pipeline to run requirements clarity, PRD writing, PRD audit, implementation handoff, and QA generation as one connected workflow."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,11 @@
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+__pycache__/
+.pytest_cache/
+.codex/
+docs/prd/
+docs/handoff/
+docs/qa/
+tasks/

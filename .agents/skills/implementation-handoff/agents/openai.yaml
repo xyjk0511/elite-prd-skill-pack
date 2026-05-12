@@ -1,0 +1,7 @@
+interface:
+  display_name: "Implementation Handoff"
+  short_description: "Turn approved PRDs into build plans."
+  default_prompt: "Use $implementation-handoff to convert an approved PRD into implementation tasks, tickets, API/data stubs, integration notes, and release planning."
+
+policy:
+  allow_implicit_invocation: false

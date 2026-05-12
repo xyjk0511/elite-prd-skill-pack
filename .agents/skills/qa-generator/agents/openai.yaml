@@ -1,0 +1,7 @@
+interface:
+  display_name: "QA Generator"
+  short_description: "Generate QA coverage from PRDs."
+  default_prompt: "Use $qa-generator to turn a PRD into a QA matrix, high-priority test cases, regression coverage, and analytics verification checks."
+
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,290 @@
+---
+name: prd-pipeline
+description: 当用户要求把一个产品想法、需求草稿、issue、会议纪要或 PRD 从“需求讨论/澄清”一路串到“完整 PRD、PRD 审计、工程交接、QA 测试用例”时使用本总控技能；适用于全链路、端到端、从想法到研发开工、从 PRD 到 tickets/测试矩阵等场景。必须先像 gsd-discuss-phase 一样分析产品灰区、让用户选择讨论区域、逐区追问关键决策；所有讨论问题必须使用 Codex 原生结构化选择 UI（request_user_input / AskUserQuestion），不得退回文本 1/2/3 选择题；如果当前 mode 不允许原生选择 UI，停止并提示启用 default_mode_request_user_input 或切到支持原生选择 UI 的交互模式。默认详细讨论 12-20 个问题，再调度 requirements-clarity、elite-prd-writer、prd-auditor、implementation-handoff、qa-generator。不要用于只写代码或只处理单一步骤。
+---
+
+# PRD Pipeline
+
+## 目标
+
+把 PRD skill-pack 的五个独立技能串成一个可执行链路：
+
+```text
+requirements-clarity
+-> elite-prd-writer
+-> prd-auditor
+-> implementation-handoff
+-> qa-generator
+```
+
+这个技能是总控入口，不直接替代子技能。它负责判断当前阶段、调用对应技能规则、维护交接包、执行 gate，并把产物落到统一目录。
+
+默认行为是**先详细讨论，再产出**。除非用户明确说“快速版”“直接写”“不要问”“按你判断”或传入 `--auto`，否则不要从一句想法直接生成全套文档。
+
+默认讨论深度：
+
+- 生成 3-4 个产品专属灰区。
+- 推荐覆盖全部关键灰区，而不是只选一个。
+- 每个灰区问 4-5 个问题。
+- 总问题量目标为 12-20 个。
+- 用户要求“快速版”时降到 6-8 个问题；用户要求“深入版/详细版”时保持 12-20 个问题；用户要求“极细”时可超过 20 个问题。
+- 所有讨论问题都必须使用 Codex 原生结构化选择 UI。不得退回文本 1/2/3 选择题；如果 `request_user_input`、`AskUserQuestion` 或等价结构化提问工具在当前 mode 中不可调用，停止当前 pipeline，并提示用户切到 Plan mode 或启用支持原生选择 UI 的交互模式。
+
+## 选择题交互规则
+
+无论是选择灰区、回答产品决策、确认是否继续，都必须先判断当前客户端是否支持原生结构化选择题。
+
+### 原生 UI 强制
+
+必须使用当前运行环境提供的 `request_user_input`、`AskUserQuestion` 或等价结构化提问工具，而不是在聊天里打印 1/2/3 文本列表。仅检测到 Codex App 不够，必须以工具实际可调用为准；Default mode 中该工具可能不可用。
+
+原生 UI 规则：
+
+- 每次提问默认 1 个问题；最多把 3 个强相关问题合并到同一次 UI 提问。
+- 每个问题提供 2-3 个互斥选项。
+- 把推荐选项放第一位；如果工具要求，在 label 上加 `(Recommended)`。
+- 不要手动添加 `其他` 选项；如果客户端会自动提供 Other，就依赖客户端自动 Other。
+- 每个选项都必须有一句简短 description，说明选择后的产品含义或取舍。
+- header 必须短，优先使用 12 个字符以内的中文短标题，例如“讨论范围”“训练目标”“适用人群”。
+- 需要多选但当前工具不支持多选时，把选项设计成组合项，例如“全部关键灰区”“先 A+B”“先 C+D”。
+
+### 工具不可用时
+
+如果原生结构化选择工具不可用：
+
+- 不要打印文本 1/2/3 选择题。
+- 不要继续生成 PRD、handoff 或 QA。
+- 停止并说明阻塞原因：当前 mode 不允许原生选择 UI；需要启用 `default_mode_request_user_input` 或切到支持 `request_user_input` / `AskUserQuestion` 的交互模式后再继续。
+
+## 适用场景
+
+使用本技能处理：
+
+- “从想法到 PRD、研发交接、QA 全流程跑一遍”
+- “把这个需求打通到研发能开工”
+- “生成 PRD + audit + handoff + QA”
+- “一条龙做完产品需求链路”
+- “端到端产出需求文档和测试用例”
+
+不要处理：
+
+- 用户只要求单一步骤。只写 PRD 用 `elite-prd-writer`；只审 PRD 用 `prd-auditor`；只拆任务用 `implementation-handoff`；只做测试用例用 `qa-generator`。
+- 用户要求直接编码。
+- 用户要求纯技术架构设计。
+
+## 前置检查
+
+开始前检查：
+
+- `AGENTS.md`
+- `README.md`
+- `docs/prd/`
+- `docs/handoff/`
+- `docs/qa/`
+- `tasks/`
+- 历史 PRD、handoff、QA 文档、issue、roadmap
+
+如果仓库已有目录和命名规则，优先遵循仓库规则。否则使用：
+
+- PRD：`docs/prd/prd-[feature-name].md`
+- Handoff：`docs/handoff/handoff-[feature-name].md`
+- QA：`docs/qa/qa-[feature-name].md`
+
+## 总控流程
+
+### Step 0: Product Discussion
+
+按 `references/discussion-guide.md` 执行讨论前置。
+
+目标：提取后续 PRD、审计、handoff、QA 都需要的产品决策，而不是让 Codex 自己脑补。
+
+流程：
+
+1. 分析用户输入，识别产品类型和边界。
+2. 生成 3-4 个**当前产品专属灰区**，不要用“UI / UX / Behavior”这类泛泛标签。
+3. 把灰区展示给用户，让用户用选择题选择要讨论哪些；默认推荐“讨论全部关键灰区”，不要提供“跳过”作为默认选项。
+4. 对每个选中的灰区先通过原生结构化选择 UI 问 4-5 个问题，每题必须有 2-3 个具体选项，并依赖客户端自动提供 Other。
+5. 追问总量默认控制在 12-20 个问题；如果用户只选了 1 个灰区，也要提醒“这样问题会偏少，是否补选其他关键灰区”。
+6. 每个灰区问完后用选择题确认：“继续问这个灰区 / 进入下一个 / 汇总当前决策 / 其他”。
+7. 所有选中灰区讨论完后，汇总决策并询问是否准备生成 PRD。
+8. 输出 `PRD Discussion Context`，作为 `Requirements Packet` 的上游输入。
+
+灰区示例：
+
+- 认知训练游戏：训练目标与人群、训练任务结构、单局节奏与反馈、难度递进与安全边界。
+- AI 简历修改：目标用户与使用场景、输入/隐私边界、AI 输出形态、用户确认与导出路径。
+- 校园二手发布：发布字段与类目、审核与风控、图片/位置/联系方式规则、发布后状态与卖家反馈。
+
+Scope guardrail:
+
+- 讨论澄清“这个能力怎么做”，不是扩功能。
+- 用户提出新能力时，记录到“Deferred Ideas”，不要纳入当前 PRD 范围。
+- 不问技术架构、具体实现方案、性能优化细节；这些交给后续 handoff 或工程设计。
+
+Auto mode:
+
+- 只有用户明确说“直接写”“不要问”“按你判断”或传入 `--auto` 时，才跳过互动。
+- 跳过时必须输出自动假设，并标记哪些假设影响 PRD 风险。
+
+Gate:
+
+- 用户完成至少 12 个关键问题，或明确要求缩短/自动继续：进入 Step 1。
+- 如果只完成少于 12 个问题，先提示哪些灰区仍缺决策，再询问是否继续讨论。
+- 用户回答表明目标用户、核心问题或范围完全不成立：停止，输出澄清问题。
+
+### Step 1: Requirements Clarity
+
+按 `requirements-clarity` 的规则识别已知事实、假设、缺口和清晰度评分。
+
+输入：`PRD Discussion Context`。
+
+输出：`Requirements Packet`。
+
+Gate:
+
+- 评分 >= 85：进入 Step 2。
+- 评分 70-84：带显式假设进入 Step 2，并在 PRD 中保留待确认问题。
+- 评分 50-69：如果用户要求继续，可带高风险假设进入 Step 2；否则先停在澄清问题。
+- 评分 < 50：停止，不生成完整 PRD，输出澄清问题和调研建议。
+
+### Step 2: PRD Writing
+
+按 `elite-prd-writer` 的规则生成完整 PRD。
+
+要求：
+
+- 使用 `Requirements Packet`。
+- 明确本期范围和非本期范围。
+- P0 功能必须有验收标准。
+- 有状态对象时必须有状态机。
+- 多角色时必须有权限矩阵。
+- 行为改变型功能必须有埋点。
+
+输出 `PRD Packet`。
+
+Gate:
+
+- PRD 缺 P0 验收标准、核心状态机、权限边界或范围边界：先修 PRD，再进入 Step 3。
+- PRD 基本完整：进入 Step 3。
+
+### Step 3: PRD Audit
+
+按 `prd-auditor` 的规则评分和判断开工状态。
+
+输出 `Audit Packet`。
+
+Gate:
+
+- 可以开工：进入 Step 4 和 Step 5。
+- 补充后开工：若无 P0 阻塞，进入 Step 4 和 Step 5，并保留待确认问题；若有 P0 阻塞，回到 Step 2 修 PRD。
+- 暂不建议开工：停止，输出阻塞项和修复建议。
+
+### Step 4: Implementation Handoff
+
+按 `implementation-handoff` 的规则生成工程交接。
+
+输入：
+
+- PRD
+- `PRD Packet`
+- `Audit Packet`
+
+输出 `Handoff Packet`。
+
+Gate:
+
+- 如果发现 PRD 范围、状态机、权限或 P0 验收标准仍缺失，停止 handoff，回到 Step 2 或 Step 3。
+- 否则进入 Step 5。
+
+### Step 5: QA Generation
+
+按 `qa-generator` 的规则生成测试矩阵和测试用例。
+
+输入：
+
+- PRD
+- `PRD Packet`
+- `Audit Packet`
+- `Handoff Packet`（如已生成）
+
+输出 `QA Packet`。
+
+必须覆盖主流程、必填校验、边界值、权限失败、空状态、网络/API 失败、重复提交、状态冲突、埋点验证和回归风险。
+
+## 输出格式
+
+默认输出：
+
+```md
+## Pipeline Summary
+
+- 功能名称：
+- 当前阶段：
+- 产物：
+- 是否完整跑完：
+- 阻塞项：
+
+## PRD Discussion Context
+
+- 产品边界：
+- 已讨论灰区：
+- 已锁定决策：
+- Claude 可自行决定：
+- Deferred Ideas：
+
+## Requirements Packet
+
+## PRD Packet
+
+## Audit Packet
+
+## Handoff Packet
+
+## QA Packet
+
+## 文件清单
+
+| 类型 | 路径 | 状态 |
+|---|---|---|
+
+## 下一步
+```
+
+## 落盘规则
+
+如果用户要求落盘，或当前仓库已有文档目录规范，默认创建：
+
+```text
+docs/prd/context-[feature-name].md
+docs/prd/prd-[feature-name].md
+docs/handoff/handoff-[feature-name].md
+docs/qa/qa-[feature-name].md
+```
+
+需要确定性写入时，使用子技能自带脚本：
+
+```bash
+python .agents/skills/elite-prd-writer/scripts/save_doc.py --path docs/prd/prd-[feature-name].md < prd.md
+python .agents/skills/implementation-handoff/scripts/save_doc.py --path docs/handoff/handoff-[feature-name].md < handoff.md
+```
+
+QA 文档可直接由 Codex 写入目标 Markdown 文件；若仓库有更具体脚本，优先用仓库脚本。
+
+## 失败与回退
+
+- 用户还没讨论关键灰区：不要生成完整文档，先问。
+- 详细模式下讨论少于 12 个问题：不要直接进入文档产出，先提示未覆盖灰区。
+- 需求不清：停在 Step 1，不假装已完成 PRD。
+- PRD 不完整：回到 Step 2 修 PRD。
+- 审计不通过：停在 Step 3，输出阻塞项。
+- handoff 发现需求缺口：回到 Step 2 或 Step 3。
+- QA 无法生成关键用例：回到 Step 2 补验收标准、状态机、权限或字段规则。
+
+## 严格禁止
+
+- 不要在用户没有选择讨论灰区、也没有明确要求自动模式时，从一句想法直接生成全套文档。
+- 不要跳过 gate 强行生成后续产物。
+- 不要把待确认问题当作已确认需求。
+- 不要在 pipeline 里直接开始编码。
+- 不要只输出 happy path。
+- 不要在 PRD 未通过审计时声称研发可开工。

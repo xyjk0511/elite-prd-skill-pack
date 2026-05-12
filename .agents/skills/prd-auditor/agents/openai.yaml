@@ -1,0 +1,7 @@
+interface:
+  display_name: "PRD Auditor"
+  short_description: "Audit PRDs for readiness and gaps."
+  default_prompt: "Use $prd-auditor to review a PRD and decide whether design, engineering, QA, and data can start work."
+
+policy:
+  allow_implicit_invocation: true

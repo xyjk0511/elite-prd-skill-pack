@@ -1,0 +1,7 @@
+interface:
+  display_name: "Requirements Clarity"
+  short_description: "Clarify vague product requirements."
+  default_prompt: "Use $requirements-clarity to clarify a vague product idea before writing a PRD."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Elite PRD Writer"
+  short_description: "Create implementation-ready PRDs."
+  default_prompt: "Use $elite-prd-writer to turn an idea, issue, meeting note, or rough draft into an implementation-ready PRD."
+
+policy:
+  allow_implicit_invocation: true
