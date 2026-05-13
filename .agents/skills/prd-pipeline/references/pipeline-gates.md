@@ -6,6 +6,7 @@ Use these gates to decide whether to continue, stop, or return to an earlier sta
 
 | Stage | Continue When | Stop / Return When |
 |---|---|---|
+| Product research | Research mission, sandbox, facts/assumptions, gray area candidates, and research result are available | Research cannot separate facts from assumptions, or no product-specific gray areas can be produced |
 | Product discussion | User selected and discussed at least one gray area, or explicitly chose auto/direct mode | User has not discussed any gray area and did not authorize auto mode |
 | Requirements clarity | Clarity score >= 85, or 70-84 with explicit assumptions | Score < 50, or core target user/problem/scope missing |
 | PRD writing | Scope, P0 requirements, state, permission, fields, analytics, and acceptance criteria are present | Missing P0 acceptance criteria, scope boundary, state machine, or permissions |
@@ -16,7 +17,7 @@ Use these gates to decide whether to continue, stop, or return to an earlier sta
 ## Required Packets
 
 ```text
-PRD Discussion Context -> Requirements Packet -> PRD Packet -> Audit Packet -> Handoff Packet -> QA Packet
+Research Packet -> PRD Discussion Context -> Requirements Packet -> PRD Packet -> Audit Packet -> Handoff Packet -> QA Packet
 ```
 
 Each packet should preserve paths, scope, blockers, and next-step status.
@@ -32,6 +33,37 @@ The pipeline is not complete until a completion artifact exists and passes valid
 | `pipeline-audit-artifact` | Default mode for normal PRD packages | `pipeline-result-[feature].json` has `passed: true`, required artifact paths, audit verdict, and no P0 blockers |
 | `human-approval-artifact` | A human stakeholder must approve before downstream work | Result JSON records an explicit approval verdict and required artifact paths |
 | `custom-validator-script` | The repository has a deterministic validator or CI check | Result JSON records the validator command and a passing validator result |
+
+## Research Artifact Schema
+
+Recommended paths:
+
+```text
+docs/prd/research-[feature-name].md
+docs/prd/research-result-[feature-name].json
+```
+
+Minimum JSON shape:
+
+```json
+{
+  "status": "passed",
+  "passed": true,
+  "research_mode": "repo-context-research",
+  "research_artifact_path": "docs/prd/research-feature.md",
+  "facts": [],
+  "assumptions": [],
+  "open_questions": [],
+  "gray_area_candidates": [],
+  "ready_for_discussion": true,
+  "validator": {
+    "verdict": "passed",
+    "reason": "Enough context exists to ask targeted product questions."
+  }
+}
+```
+
+Research fails the gate when `ready_for_discussion` is not true and the user has not explicitly chosen to continue with assumptions.
 
 ## Completion Artifact Schema
 
@@ -50,6 +82,8 @@ Minimum shape:
   "validation_mode": "pipeline-audit-artifact",
   "completion_artifact_path": "docs/prd/pipeline-result-feature.json",
   "artifacts": {
+    "research": "docs/prd/research-feature.md",
+    "research_result": "docs/prd/research-result-feature.json",
     "discussion_context": "docs/prd/context-feature.md",
     "prd": "docs/prd/prd-feature.md",
     "audit": "docs/prd/audit-feature.md",
@@ -94,8 +128,9 @@ Only stop with “complete” when:
 
 1. Required Markdown artifacts exist.
 2. The result JSON exists.
-3. `passed` is `true`.
-4. The selected validation mode's required evidence is present.
-5. No P0 blockers remain.
+3. The research result exists and is discussion-ready.
+4. `passed` is `true`.
+5. The selected validation mode's required evidence is present.
+6. No P0 blockers remain.
 
 If any item fails, return to the earliest stage that can repair the missing evidence.

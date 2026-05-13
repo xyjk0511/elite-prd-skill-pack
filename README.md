@@ -1,12 +1,12 @@
 # Elite PRD Skill Pack for Codex
 
-一套面向 Codex 的产品需求工作流技能包，用于把产品想法从需求讨论一路推进到 PRD、审计、工程交接和 QA 测试设计。
+一套面向 Codex 的产品需求工作流技能包，用于把产品想法从调查研究推进到需求讨论、PRD、审计、工程交接和 QA 测试设计。
 
 ## What It Includes
 
 | Skill | Purpose |
 |---|---|
-| `prd-pipeline` | 总控入口：需求讨论 -> 澄清 -> PRD -> 审计 -> 工程交接 -> QA |
+| `prd-pipeline` | 总控入口：调查研究 -> 需求讨论 -> 澄清 -> PRD -> 审计 -> 工程交接 -> QA |
 | `requirements-clarity` | 模糊需求澄清，输出清晰度评分和 Requirements Packet |
 | `elite-prd-writer` | 创建、重写、补全完整 PRD |
 | `prd-auditor` | 审计 PRD 是否达到设计、研发、测试开工标准 |
@@ -15,13 +15,15 @@
 
 ## Key Behavior
 
-`prd-pipeline` 和 `requirements-clarity` 默认不直接脑补 PRD。它们会先识别 3-4 个产品专属灰区，并通过 Codex 原生结构化选择 UI 让用户点选决策。
+`prd-pipeline` 和 `requirements-clarity` 默认不直接脑补 PRD。`prd-pipeline` 会先按 `$autoresearch` 的方法建立 research mission、sandbox 和 result，确认已知事实、假设和调查缺口，再识别 3-4 个产品专属灰区，并通过 Codex 原生结构化选择 UI 让用户点选决策。
 
 This pack is intentionally strict:
 
 - It requires native structured choice UI such as `request_user_input` / `AskUserQuestion`.
 - It does not fall back to plain text `1/2/3` choice lists.
 - If native choice UI is unavailable, the workflow should stop and ask the user to enable it.
+- Investigation is mission-gated, inspired by `$autoresearch`: before discussion, the pipeline should produce `docs/prd/research-[feature].md` and `docs/prd/research-result-[feature].json`.
+- Research modes are `repo-context-research`, `source-backed-research`, and `assumption-declared-research`.
 - Default detailed discussion asks 12-20 cumulative questions across multiple native UI rounds, not just one popup.
 - One native UI round can contain up to 3 questions; the workflow should continue asking follow-up rounds until the selected discussion depth is complete.
 - Each question should provide 3 formal options when possible. Codex adds the Other/custom input row automatically, so users typically see 4 visible rows.
@@ -85,6 +87,8 @@ To validate a generated PRD pipeline result:
 ```bash
 python .agents/skills/prd-pipeline/scripts/validate_pipeline_result.py --result docs/prd/pipeline-result-item-publishing.json
 ```
+
+The pipeline result validator also checks that the research artifact and research result exist and that `ready_for_discussion` is true.
 
 ## Usage
 

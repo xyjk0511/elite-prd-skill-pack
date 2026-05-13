@@ -15,7 +15,15 @@ from pathlib import Path
 from typing import Any
 
 
-REQUIRED_ARTIFACTS = ("discussion_context", "prd", "audit", "handoff", "qa")
+REQUIRED_ARTIFACTS = (
+    "research",
+    "research_result",
+    "discussion_context",
+    "prd",
+    "audit",
+    "handoff",
+    "qa",
+)
 VALIDATION_MODES = {
     "pipeline-audit-artifact",
     "human-approval-artifact",
@@ -106,15 +114,35 @@ def main() -> int:
         return fail("missing_artifact_keys", "required artifact paths are missing", keys=missing_keys)
 
     missing_files = []
+    resolved_artifacts: dict[str, Path] = {}
     for key in REQUIRED_ARTIFACTS:
         artifact_value = artifacts[key]
         if not isinstance(artifact_value, str):
             return fail("invalid_artifact_path", "artifact path must be a string", key=key)
         artifact_path = resolve_artifact(root, artifact_value)
+        resolved_artifacts[key] = artifact_path
         if not artifact_path.exists():
             missing_files.append({"key": key, "path": str(artifact_path)})
     if missing_files:
         return fail("missing_artifact_files", "referenced artifacts do not exist", files=missing_files)
+
+    try:
+        research_result = load_json(resolved_artifacts["research_result"])
+    except ValueError as exc:
+        return fail("invalid_research_result_json", str(exc))
+    if research_result.get("ready_for_discussion") is not True:
+        return fail(
+            "research_not_ready",
+            "research result must contain ready_for_discussion=true",
+            ready_for_discussion=research_result.get("ready_for_discussion"),
+        )
+    gray_areas = research_result.get("gray_area_candidates", [])
+    if not isinstance(gray_areas, list) or len(gray_areas) < 3:
+        return fail(
+            "insufficient_gray_areas",
+            "research result must contain at least 3 gray_area_candidates",
+            count=len(gray_areas) if isinstance(gray_areas, list) else None,
+        )
 
     if mode == "pipeline-audit-artifact":
         audit = data.get("audit")
