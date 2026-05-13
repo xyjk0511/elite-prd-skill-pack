@@ -13,11 +13,12 @@ Use these gates to decide whether to continue, stop, or return to an earlier sta
 | PRD audit | Audit says “可以开工” or “补充后开工” without P0 blockers | Audit says “暂不建议开工” or has P0 blockers |
 | Handoff | PRD and audit packets are available, implementation blockers are explicit | Handoff exposes missing product decisions |
 | QA generation | PRD has testable acceptance criteria and enough state/permission/field rules | QA cannot cover P0 paths due to missing PRD details |
+| Integrated delivery | Integrated Markdown exists; DOCX exists when requested or declared in result JSON | Integrated source paths are missing, DOCX export fails, or DOCX is treated as the only source of truth |
 
 ## Required Packets
 
 ```text
-Research Packet -> PRD Discussion Context -> Pipeline State -> Requirements Packet -> PRD Packet -> Audit Packet -> Handoff Packet -> QA Packet
+Research Packet -> PRD Discussion Context -> Pipeline State -> Requirements Packet -> PRD Packet -> Audit Packet -> Handoff Packet -> QA Packet -> Integrated Delivery Package
 ```
 
 Each packet should preserve paths, scope, blockers, and next-step status.
@@ -89,7 +90,9 @@ Minimum shape:
     "prd": "docs/prd/prd-feature.md",
     "audit": "docs/prd/audit-feature.md",
     "handoff": "docs/handoff/handoff-feature.md",
-    "qa": "docs/qa/qa-feature.md"
+    "qa": "docs/qa/qa-feature.md",
+    "integrated_markdown": "docs/prd/prd-handoff-package-feature.md",
+    "integrated_docx": "docs/prd/prd-handoff-package-feature.docx"
   },
   "discussion": {
     "mode": "detailed",
@@ -139,6 +142,7 @@ Minimum shape:
     "prd_audit": {"status": "passed"},
     "implementation_handoff": {"status": "passed"},
     "qa_generation": {"status": "passed"},
+    "integrated_delivery": {"status": "passed"},
     "completion_validation": {"status": "passed"}
   }
 }
@@ -181,8 +185,9 @@ Only stop with “complete” when:
 3. The research result exists and is discussion-ready.
 4. The pipeline state exists and is at `validated`.
 5. The discussion metadata passes question-count, ambiguity-score, and required-section gates.
-6. `passed` is `true`.
-7. The selected validation mode's required evidence is present.
-8. No P0 blockers remain.
+6. Any declared integrated Markdown or DOCX artifact exists.
+7. `passed` is `true`.
+8. The selected validation mode's required evidence is present.
+9. No P0 blockers remain.
 
 If any item fails, return to the earliest stage that can repair the missing evidence.

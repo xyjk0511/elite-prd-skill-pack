@@ -25,6 +25,10 @@ REQUIRED_ARTIFACTS = (
     "handoff",
     "qa",
 )
+OPTIONAL_ARTIFACTS = (
+    "integrated_markdown",
+    "integrated_docx",
+)
 VALIDATION_MODES = {
     "pipeline-audit-artifact",
     "human-approval-artifact",
@@ -38,6 +42,7 @@ REQUIRED_STAGES = (
     "prd_audit",
     "implementation_handoff",
     "qa_generation",
+    "integrated_delivery",
     "completion_validation",
 )
 COMPLETE_STATUSES = {"passed", "complete", "completed", "validated"}
@@ -219,7 +224,9 @@ def main() -> int:
 
     missing_files = []
     resolved_artifacts: dict[str, Path] = {}
-    for key in REQUIRED_ARTIFACTS:
+    for key in REQUIRED_ARTIFACTS + tuple(
+        key for key in OPTIONAL_ARTIFACTS if artifacts.get(key)
+    ):
         artifact_value = artifacts[key]
         if not isinstance(artifact_value, str):
             return fail("invalid_artifact_path", "artifact path must be a string", key=key)
@@ -229,6 +236,10 @@ def main() -> int:
             missing_files.append({"key": key, "path": str(artifact_path)})
     if missing_files:
         return fail("missing_artifact_files", "referenced artifacts do not exist", files=missing_files)
+
+    docx_path = resolved_artifacts.get("integrated_docx")
+    if docx_path and docx_path.suffix.lower() != ".docx":
+        return fail("invalid_integrated_docx", "integrated_docx must point to a .docx file", path=str(docx_path))
 
     discussion_error, discussion = validate_discussion(data)
     if discussion_error:

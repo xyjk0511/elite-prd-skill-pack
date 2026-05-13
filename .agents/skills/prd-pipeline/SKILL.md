@@ -17,6 +17,7 @@ product-research
 -> prd-auditor
 -> implementation-handoff
 -> qa-generator
+-> integrated-delivery-package
 -> completion-validation
 ```
 
@@ -39,6 +40,59 @@ product-research
 - 所有讨论问题都必须使用 Codex 原生结构化选择 UI。不得退回文本 1/2/3 选择题；如果 `request_user_input`、`AskUserQuestion` 或等价结构化提问工具在当前 mode 中不可调用，停止当前 pipeline，并提示用户切到 Plan mode 或启用支持原生选择 UI 的交互模式。
 - 不要把“一次弹出的 3 个问题”当成完整讨论。原生 UI 每轮最多弹 3 个问题；用户回答后必须继续下一轮，直到达到当前模式的问题目标或用户明确要求停止/生成。
 - 讨论轮次不是唯一完成标准。每轮回答后必须更新歧义评分；只有问题数量和清晰度 gate 都满足，才进入 PRD 产出。
+- 完整交付时默认准备一份整合版 Markdown；用户要求 Word / docx / 交付版 / 给老板或跨团队评审时，再导出同内容的 `.docx`。Markdown 是事实源，Word 是派生评审件。
+
+## 整合交付版 Word
+
+研发协作的事实源仍然是仓库里的 Markdown 文件；Word 只作为评审、转发和非研发人员阅读的整合版。
+
+默认整合版路径：
+
+```text
+docs/prd/prd-handoff-package-[feature-name].md
+docs/prd/prd-handoff-package-[feature-name].docx
+```
+
+整合版内容顺序：
+
+1. Pipeline Summary：当前阶段、完成状态、文件清单、阻塞项。
+2. Executive Summary：一句话概述、本期目标、非本期范围、关键决策。
+3. Research Summary：事实、假设、灰区、待确认问题。
+4. Discussion Decisions：已讨论灰区、歧义评分、锁定决策、决策边界。
+5. PRD：完整产品需求正文。
+6. Audit Summary：评分、P0 blocker、是否可开工、修复记录。
+7. Engineering Handoff：模块拆分、前后端任务、接口/数据草案、联调计划。
+8. QA Test Design：测试矩阵、关键用例、回归风险、埋点验证。
+9. Appendix：风险依赖、开放问题、pipeline state、completion validation 摘要。
+
+生成规则：
+
+- 先生成 `prd-handoff-package-[feature].md`，再从它或各分文件导出 `.docx`。
+- 不要把 Word 作为唯一事实源；Word 内容必须能从 Markdown 产物重新生成。
+- 如果只改了 PRD / handoff / QA 任一源文档，整合版 Markdown 和 Word 都要重新生成。
+- `pipeline-result-[feature].json` 中可记录：
+
+```json
+{
+  "artifacts": {
+    "integrated_markdown": "docs/prd/prd-handoff-package-feature.md",
+    "integrated_docx": "docs/prd/prd-handoff-package-feature.docx"
+  }
+}
+```
+
+若仓库允许运行本技能脚本，可用：
+
+```bash
+python .agents/skills/prd-pipeline/scripts/build_integrated_docx.py \
+  --output docs/prd/prd-handoff-package-[feature-name].docx \
+  --title "[功能名称] PRD Handoff Package" \
+  --part "Pipeline Summary=docs/prd/prd-handoff-package-[feature-name].md" \
+  --part "PRD=docs/prd/prd-[feature-name].md" \
+  --part "Audit=docs/prd/audit-[feature-name].md" \
+  --part "Engineering Handoff=docs/handoff/handoff-[feature-name].md" \
+  --part "QA Test Design=docs/qa/qa-[feature-name].md"
+```
 
 ## 选择题交互规则
 
@@ -140,6 +194,7 @@ docs/prd/pipeline-state-[feature-name].json
     "prd_audit": {"status": "pending"},
     "implementation_handoff": {"status": "pending"},
     "qa_generation": {"status": "pending"},
+    "integrated_delivery": {"status": "pending"},
     "completion_validation": {"status": "pending"}
   }
 }
@@ -207,7 +262,9 @@ docs/prd/pipeline-result-[feature-name].json
     "prd": "docs/prd/prd-feature.md",
     "audit": "docs/prd/audit-feature.md",
     "handoff": "docs/handoff/handoff-feature.md",
-    "qa": "docs/qa/qa-feature.md"
+    "qa": "docs/qa/qa-feature.md",
+    "integrated_markdown": "docs/prd/prd-handoff-package-feature.md",
+    "integrated_docx": "docs/prd/prd-handoff-package-feature.docx"
   },
   "discussion": {
     "mode": "detailed",
@@ -514,7 +571,36 @@ Gate:
 
 必须覆盖主流程、必填校验、边界值、权限失败、空状态、网络/API 失败、重复提交、状态冲突、埋点验证和回归风险。
 
-### Step 7: Completion Validation
+### Step 7: Integrated Delivery Package
+
+目标：把分散产物合成一个面向研发、测试、设计、老板和跨团队评审的整合交付包。
+
+输入：
+
+- `Research Packet`
+- `PRD Discussion Context`
+- `Pipeline State`
+- PRD
+- Audit
+- Handoff
+- QA
+- Completion Validation 摘要草案
+
+输出：
+
+```text
+docs/prd/prd-handoff-package-[feature-name].md
+docs/prd/prd-handoff-package-[feature-name].docx
+```
+
+Gate:
+
+- 整合版 Markdown 必须存在，并列出所有源文档路径。
+- 用户要求 Word、docx、整合版、汇报版、给老板/评审/客户看时，必须生成 `.docx`。
+- Word 生成失败时，不得影响 Markdown 源文档；报告“Markdown package 已生成，DOCX 导出失败”并给出错误原因。
+- DOCX 是派生件，不允许只改 Word 不改源 Markdown。
+
+### Step 8: Completion Validation
 
 按 `references/pipeline-gates.md` 执行最终验证，并写入 `pipeline-result-[feature-name].json`。
 
@@ -529,6 +615,7 @@ Gate:
 - Audit 文件存在，且没有 P0 blocker；如果曾经回环，必须使用修复后的最新 audit。
 - Handoff 文件存在，且包含任务拆解、接口/数据草案、联调计划和发布/回滚要点。
 - QA 文件存在，且覆盖主流程、异常、权限、边界、状态冲突和埋点验证。
+- 如果 result JSON 声明了 `integrated_markdown` 或 `integrated_docx`，对应文件必须存在；`integrated_docx` 后缀必须是 `.docx`。
 - result JSON 存在，`passed` 为 `true`。
 
 如果仓库允许运行本技能脚本，可用：
@@ -592,6 +679,11 @@ python .agents/skills/prd-pipeline/scripts/validate_pipeline_result.py --result 
 
 ## QA Packet
 
+## Integrated Delivery Package
+
+- integrated_markdown:
+- integrated_docx:
+
 ## Completion Validation
 
 - validation_mode:
@@ -619,6 +711,8 @@ docs/prd/research-result-[feature-name].json
 docs/prd/pipeline-state-[feature-name].json
 docs/prd/prd-[feature-name].md
 docs/prd/audit-[feature-name].md
+docs/prd/prd-handoff-package-[feature-name].md
+docs/prd/prd-handoff-package-[feature-name].docx
 docs/prd/pipeline-result-[feature-name].json
 docs/handoff/handoff-[feature-name].md
 docs/qa/qa-[feature-name].md
@@ -629,6 +723,7 @@ docs/qa/qa-[feature-name].md
 ```bash
 python .agents/skills/elite-prd-writer/scripts/save_doc.py --path docs/prd/prd-[feature-name].md < prd.md
 python .agents/skills/implementation-handoff/scripts/save_doc.py --path docs/handoff/handoff-[feature-name].md < handoff.md
+python .agents/skills/prd-pipeline/scripts/build_integrated_docx.py --output docs/prd/prd-handoff-package-[feature-name].docx --title "[功能名称] PRD Handoff Package" --part "PRD=docs/prd/prd-[feature-name].md" --part "Engineering Handoff=docs/handoff/handoff-[feature-name].md" --part "QA Test Design=docs/qa/qa-[feature-name].md"
 ```
 
 QA 文档可直接由 Codex 写入目标 Markdown 文件；若仓库有更具体脚本，优先用仓库脚本。
@@ -645,6 +740,7 @@ QA 文档可直接由 Codex 写入目标 Markdown 文件；若仓库有更具体
 - 审计不通过：写入 `return_to_prd_reason` 并回到 Step 3；重复 3 次仍不通过时停止并输出根因诊断。
 - handoff 发现需求缺口：回到 Step 3 或 Step 4。
 - QA 无法生成关键用例：回到 Step 3 补验收标准、状态机、权限或字段规则。
+- 整合版 Word 导出失败：保留 Markdown 整合包，修复 DOCX 生成脚本或输入路径后重试。
 - completion artifact 不存在或未通过：不要声称 pipeline 完成，先修复缺失产物或阻塞项。
 
 ## 严格禁止

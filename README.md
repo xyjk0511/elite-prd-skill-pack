@@ -31,6 +31,7 @@ This pack is intentionally strict:
 - Discussion is ambiguity-gated, inspired by `$deep-interview`: question count alone is not enough. The pipeline tracks a 100-point ambiguity score and requires non-goals, decision boundaries, and locked decisions before PRD writing.
 - The pipeline is resumable: it should maintain `docs/prd/pipeline-state-[feature].json` and continue from the earliest incomplete stage instead of restarting.
 - Audit is a loop, not a terminal comment. P0 audit blockers return to PRD writing with `return_to_prd_reason`; repeated blockers stop with a diagnosis instead of silently continuing.
+- Full delivery can include an integrated review Word file: `docs/prd/prd-handoff-package-[feature].docx`. The Markdown package remains the source of truth; DOCX is a derived review/share artifact.
 - Completion is artifact-gated, inspired by `$autoresearch`: the full pipeline should write `docs/prd/pipeline-result-[feature].json` and only report complete when that result records `passed: true`.
 - The default validation mode is `pipeline-audit-artifact`; advanced teams can use `human-approval-artifact` or `custom-validator-script`.
 
@@ -92,6 +93,17 @@ python .agents/skills/prd-pipeline/scripts/validate_pipeline_result.py --result 
 ```
 
 The pipeline result validator also checks that the research artifact and research result exist, that `ready_for_discussion` is true, that pipeline state reached `validated`, and that discussion metadata passes the question-count and ambiguity-score gates.
+
+To build an integrated Word file from generated Markdown artifacts:
+
+```bash
+python .agents/skills/prd-pipeline/scripts/build_integrated_docx.py \
+  --output docs/prd/prd-handoff-package-item-publishing.docx \
+  --title "商品发布功能 PRD Handoff Package" \
+  --part "PRD=docs/prd/prd-item-publishing.md" \
+  --part "Engineering Handoff=docs/handoff/handoff-item-publishing.md" \
+  --part "QA Test Design=docs/qa/qa-item-publishing.md"
+```
 
 ## Usage
 
