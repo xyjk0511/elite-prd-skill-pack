@@ -28,6 +28,9 @@ This pack is intentionally strict:
 - One native UI round can contain up to 3 questions; the workflow should continue asking follow-up rounds until the selected discussion depth is complete.
 - Each question should provide 3 formal options when possible. Codex adds the Other/custom input row automatically, so users typically see 4 visible rows.
 - Do not provide 4 formal options manually: the current `request_user_input` schema accepts 2-3 formal options, then the client adds Other.
+- Discussion is ambiguity-gated, inspired by `$deep-interview`: question count alone is not enough. The pipeline tracks a 100-point ambiguity score and requires non-goals, decision boundaries, and locked decisions before PRD writing.
+- The pipeline is resumable: it should maintain `docs/prd/pipeline-state-[feature].json` and continue from the earliest incomplete stage instead of restarting.
+- Audit is a loop, not a terminal comment. P0 audit blockers return to PRD writing with `return_to_prd_reason`; repeated blockers stop with a diagnosis instead of silently continuing.
 - Completion is artifact-gated, inspired by `$autoresearch`: the full pipeline should write `docs/prd/pipeline-result-[feature].json` and only report complete when that result records `passed: true`.
 - The default validation mode is `pipeline-audit-artifact`; advanced teams can use `human-approval-artifact` or `custom-validator-script`.
 
@@ -88,7 +91,7 @@ To validate a generated PRD pipeline result:
 python .agents/skills/prd-pipeline/scripts/validate_pipeline_result.py --result docs/prd/pipeline-result-item-publishing.json
 ```
 
-The pipeline result validator also checks that the research artifact and research result exist and that `ready_for_discussion` is true.
+The pipeline result validator also checks that the research artifact and research result exist, that `ready_for_discussion` is true, that pipeline state reached `validated`, and that discussion metadata passes the question-count and ambiguity-score gates.
 
 ## Usage
 

@@ -19,6 +19,7 @@ REQUIRED_ARTIFACTS = (
     "research",
     "research_result",
     "discussion_context",
+    "pipeline_state",
     "prd",
     "audit",
     "handoff",
@@ -29,6 +30,29 @@ VALIDATION_MODES = {
     "human-approval-artifact",
     "custom-validator-script",
 }
+REQUIRED_STAGES = (
+    "product_research",
+    "product_discussion",
+    "requirements_clarity",
+    "prd_writing",
+    "prd_audit",
+    "implementation_handoff",
+    "qa_generation",
+    "completion_validation",
+)
+COMPLETE_STATUSES = {"passed", "complete", "completed", "validated"}
+VALIDATED_STAGES = {"validated", "complete", "completed"}
+DISCUSSION_MIN_QUESTIONS = {
+    "quick": 6,
+    "detailed": 12,
+    "default": 12,
+    "exhaustive": 20,
+}
+REQUIRED_DISCUSSION_SECTIONS = (
+    "non_goals",
+    "decision_boundaries",
+    "locked_decisions",
+)
 
 
 def fail(code: str, message: str, **extra: Any) -> int:
@@ -64,6 +88,86 @@ def resolve_artifact(base_dir: Path, artifact_path: str) -> Path:
     if not path.is_absolute():
         path = base_dir / path
     return path
+
+
+def validate_discussion(data: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
+    discussion = data.get("discussion")
+    if not isinstance(discussion, dict):
+        return "discussion object is required", {}
+
+    mode = str(discussion.get("mode", "detailed")).strip().lower()
+    min_questions = DISCUSSION_MIN_QUESTIONS.get(mode, 12)
+
+    question_count = discussion.get("question_count")
+    if not isinstance(question_count, int) or question_count < 0:
+        return "discussion.question_count must be a non-negative integer", discussion
+
+    ambiguity_score = discussion.get("ambiguity_score")
+    if not isinstance(ambiguity_score, int) or not 0 <= ambiguity_score <= 100:
+        return "discussion.ambiguity_score must be an integer from 0 to 100", discussion
+
+    continue_with_assumptions = discussion.get("continue_with_assumptions") is True
+    if question_count < min_questions and not continue_with_assumptions:
+        return (
+            "discussion.question_count is below the minimum for the selected mode "
+            "and continue_with_assumptions is not true"
+        ), discussion
+
+    if ambiguity_score < 85:
+        if not continue_with_assumptions or ambiguity_score < 70:
+            return (
+                "discussion.ambiguity_score must be >=85, or >=70 with "
+                "continue_with_assumptions=true"
+            ), discussion
+
+    required_sections = discussion.get("required_sections")
+    if not isinstance(required_sections, dict):
+        return "discussion.required_sections must be an object", discussion
+    missing_sections = [
+        key for key in REQUIRED_DISCUSSION_SECTIONS if required_sections.get(key) is not True
+    ]
+    if missing_sections:
+        return "discussion required sections are not confirmed: " + ", ".join(missing_sections), discussion
+
+    return None, discussion
+
+
+def validate_pipeline_state(state_path: Path) -> tuple[str | None, dict[str, Any]]:
+    try:
+        state = load_json(state_path)
+    except ValueError as exc:
+        return str(exc), {}
+
+    current_stage = str(state.get("current_stage", "")).strip()
+    if current_stage not in VALIDATED_STAGES:
+        return "pipeline_state.current_stage must be validated for a passed result", state
+
+    stages = state.get("stages")
+    if not isinstance(stages, dict):
+        return "pipeline_state.stages must be an object", state
+
+    incomplete = []
+    for stage in REQUIRED_STAGES:
+        entry = stages.get(stage)
+        status = entry.get("status") if isinstance(entry, dict) else None
+        if status not in COMPLETE_STATUSES:
+            incomplete.append({"stage": stage, "status": status})
+    if incomplete:
+        return "pipeline_state has incomplete required stages", {"incomplete": incomplete}
+
+    loop_counts = state.get("loop_counts", {})
+    if loop_counts is not None and not isinstance(loop_counts, dict):
+        return "pipeline_state.loop_counts must be an object", state
+    audit_loops = (loop_counts or {}).get("audit_to_prd", 0)
+    if not isinstance(audit_loops, int) or audit_loops < 0:
+        return "pipeline_state.loop_counts.audit_to_prd must be a non-negative integer", state
+    if audit_loops > 3:
+        return "pipeline_state.loop_counts.audit_to_prd exceeds the maximum of 3", state
+
+    if str(state.get("return_to_prd_reason", "")).strip():
+        return "pipeline_state.return_to_prd_reason must be empty after validation passes", state
+
+    return None, state
 
 
 def main() -> int:
@@ -125,6 +229,14 @@ def main() -> int:
             missing_files.append({"key": key, "path": str(artifact_path)})
     if missing_files:
         return fail("missing_artifact_files", "referenced artifacts do not exist", files=missing_files)
+
+    discussion_error, discussion = validate_discussion(data)
+    if discussion_error:
+        return fail("invalid_discussion_gate", discussion_error, discussion=discussion)
+
+    state_error, state = validate_pipeline_state(resolved_artifacts["pipeline_state"])
+    if state_error:
+        return fail("invalid_pipeline_state", state_error, state=state)
 
     try:
         research_result = load_json(resolved_artifacts["research_result"])

@@ -15,8 +15,9 @@ Capture product decisions that downstream PRD, audit, handoff, and QA steps need
 5. Target 12-20 questions total in the default detailed mode.
 6. Ask at most 3 questions per native UI round; after the user answers, continue with the next round until the mode's question target is reached.
 7. After each area, ask whether to continue that area or move to the next using a native choice control question.
-8. Summarize decisions into `PRD Discussion Context`.
-9. Ask whether to generate the PRD package now using a native choice control question.
+8. After every round, update ambiguity score, question count, and the missing decision dimensions.
+9. Summarize decisions into `PRD Discussion Context`.
+10. Ask whether to generate the PRD package now using a native choice control question.
 
 ## Discussion Depth
 
@@ -35,6 +36,38 @@ Native UI rounds are not the same as total question count:
 - A native UI round may contain 1-3 questions.
 - A default detailed discussion usually needs 4-7 rounds to reach 12-20 total questions.
 - Do not stop after the first 3 questions unless the user explicitly asks to stop or continue with assumptions.
+- Question count is a floor, not proof of readiness. The discussion must also meet the ambiguity score gate.
+
+## Ambiguity Scoring
+
+Score the PRD discussion after each native UI round. Use a 100-point score made from ten 0-10 dimensions:
+
+| Dimension | What It Checks |
+|---|---|
+| target_user | Target users, roles, and usage context are concrete |
+| core_problem | The core user/business problem is explicit |
+| scope | In-scope capabilities are bounded |
+| non_goals | Out-of-scope items are explicit |
+| success_metrics | Success and guardrail metrics are defined |
+| core_flow | Main, branch, exit, and return flows are clear |
+| state_permissions | Object states and role permissions are clear |
+| data_fields | Fields, objects, and validation rules are clear |
+| edge_cases | Empty/error/retry/duplicate/conflict cases are clear |
+| analytics_launch | Tracking, launch, rollback, and observation are clear |
+
+Readiness rules:
+
+- Detailed mode: require question_count >= 12 and ambiguity_score >= 85.
+- Quick mode: require question_count >= 6 and ambiguity_score >= 70, then label assumptions.
+- Exhaustive mode: require question_count >= 20 and no core dimension below 8.
+- If score < 70, keep asking native structured questions instead of writing the PRD.
+- If score is 70-84, continue only when the user explicitly chooses to proceed with assumptions.
+
+Hard gates:
+
+- `non_goals` must be present.
+- `decision_boundaries` must state what Codex may decide and what must be decided by the user/team.
+- `locked_decisions` must be enough to support PRD, audit, handoff, and QA.
 
 ## Gray Area Identification
 
@@ -189,6 +222,15 @@ Across the full discussion, cover these categories when relevant:
 
 ### Discussed Gray Areas
 
+### Ambiguity Score
+
+| Dimension | Score | Evidence | Remaining Gap |
+|---|---:|---|---|
+
+### Non-Goals
+
+### Decision Boundaries
+
 ### Locked Decisions
 
 ### Claude's Discretion
@@ -196,6 +238,24 @@ Across the full discussion, cover these categories when relevant:
 ### Deferred Ideas
 
 ### Open Questions
+```
+
+Also persist the machine-checkable discussion summary inside the final completion artifact:
+
+```json
+{
+  "discussion": {
+    "mode": "detailed",
+    "question_count": 14,
+    "ambiguity_score": 88,
+    "continue_with_assumptions": false,
+    "required_sections": {
+      "non_goals": true,
+      "decision_boundaries": true,
+      "locked_decisions": true
+    }
+  }
+}
 ```
 
 ## Scope Guardrail
